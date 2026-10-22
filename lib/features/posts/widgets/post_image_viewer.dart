@@ -5,6 +5,7 @@ import 'package:booruflow/features/posts/models/post.dart';
 import 'package:booruflow/features/posts/widgets/booru_image.dart';
 import 'package:booruflow/features/posts/widgets/post_detail_panel.dart'
     show PostRatingBadge;
+import 'package:booruflow/features/posts/widgets/post_video_player.dart';
 import 'package:booruflow/intl/translations.g.dart';
 import 'package:booruflow/shared/app_theme.dart';
 import 'package:booruflow/shared/widgets/interaction_controls.dart';
@@ -55,6 +56,7 @@ class PostImageViewer extends StatelessWidget {
               final pagePost = posts[index];
               return _PostImagePage(
                 post: pagePost,
+                active: index == pageIndex,
                 onOpen: () => onOpen(pagePost),
                 onDownload: () => onDownload(pagePost),
               );
@@ -134,17 +136,20 @@ class PostImageViewer extends StatelessWidget {
           ],
           PositionedDirectional(
             end: 16,
-            bottom: 16,
+            // Keep clear of the video seek bar and controls.
+            bottom: selectedPost.isVideo ? 76 : 16,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AppIconButton(
-                  kind: AppIconButtonKind.surface,
-                  icon: Icon(Icons.zoom_out_map_outlined),
-                  tooltip: t.postDetail.viewOriginal,
-                  onPressed: () => onOpen(selectedPost),
-                ),
-                const SizedBox(width: 8),
+                if (!selectedPost.isVideo) ...[
+                  AppIconButton(
+                    kind: AppIconButtonKind.surface,
+                    icon: Icon(Icons.zoom_out_map_outlined),
+                    tooltip: t.postDetail.viewOriginal,
+                    onPressed: () => onOpen(selectedPost),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 AppIconButton(
                   kind: AppIconButtonKind.surface,
                   icon: Icon(Icons.download_outlined),
@@ -171,16 +176,42 @@ class PostImageViewer extends StatelessWidget {
 class _PostImagePage extends StatelessWidget {
   const _PostImagePage({
     required this.post,
+    required this.active,
     required this.onOpen,
     required this.onDownload,
   });
 
   final Post post;
+  final bool active;
   final VoidCallback onOpen;
   final VoidCallback onDownload;
 
   @override
   Widget build(BuildContext context) {
+    if (post.isVideo) {
+      // No tap handler here: taps go to the video controls (play, seek, volume).
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final size = _fitImage(
+            post: post,
+            maxWidth: math.max(1.0, constraints.maxWidth),
+            maxHeight: math.max(1.0, constraints.maxHeight),
+          );
+          return Center(
+            child: SizedBox(
+              width: size.width,
+              height: size.height,
+              child: PostVideoPlayer(
+                post: post,
+                active: active,
+                width: size.width,
+                height: size.height,
+              ),
+            ),
+          );
+        },
+      );
+    }
     final thumbnail = post.variant(MediaVariantKind.thumbnail);
     return LayoutBuilder(
       builder: (context, constraints) {
