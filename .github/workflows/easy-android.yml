@@ -1,0 +1,47 @@
+﻿name: Easy Android Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up SDKs and caches
+        uses: ./.github/actions/setup
+        with:
+          platform: android
+          rust-targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Make a temporary signing key
+        run: |
+          keytool -genkeypair -keystore android/app/ci-key.jks -alias ci \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass cipass123 -keypass cipass123 -dname "CN=BooruFlow"
+
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --android-project-arg=KEYSTORE_FILE=ci-key.jks \
+            --android-project-arg=KEYSTORE_PASSWORD=cipass123 \
+            --android-project-arg=KEY_ALIAS=ci \
+            --android-project-arg=KEY_PASSWORD=cipass123
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: booruflow-apk
+          path: build/app/outputs/apk/release/*.apk
